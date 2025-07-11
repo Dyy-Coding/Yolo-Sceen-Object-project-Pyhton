@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YOLOv8 Tracker - GenZ UI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      background: #121212;
+      font-family: 'Poppins', sans-serif;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      padding: 1rem 2rem;
+      background: #1f1f1f;
+      text-align: center;
+      font-weight: 600;
+      font-size: 1.8rem;
+      letter-spacing: 1.2px;
+      color: #7cffcb;
+      text-shadow: 0 0 8px #7cffcb;
+    }
+    main {
+      flex: 1;
+      display: flex;
+      padding: 1rem 2rem;
+      gap: 2rem;
+    }
+    #video-container {
+      flex: 2;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 12px #7cffcbaa;
+    }
+    #video-feed {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #222;
+      display: block;
+    }
+    #info-panel {
+      flex: 1;
+      background: #1f1f1f;
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 0 12px #7cffcbaa;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    #detected-objects {
+      flex-grow: 1;
+    }
+    #detected-objects h2 {
+      color: #7cffcb;
+      margin-bottom: 1rem;
+      font-weight: 600;
+      letter-spacing: 1.1px;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+      font-size: 1.1rem;
+    }
+    ul li {
+      margin-bottom: 0.8rem;
+      padding: 0.3rem 0.6rem;
+      background: #292929;
+      border-radius: 8px;
+      box-shadow: 0 0 5px #7cffcb44 inset;
+      transition: background 0.3s ease;
+    }
+    ul li:hover {
+      background: #40e0d0;
+      color: #111;
+      font-weight: 700;
+      cursor: default;
+    }
+    #fps {
+      font-size: 1.4rem;
+      font-weight: 600;
+      text-align: right;
+      color: #7cffcb;
+      text-shadow: 0 0 10px #7cffcb;
+    }
+    #controls button {
+      padding: 0.6rem 1.2rem;
+      margin: 0.3rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #121212;
+      background: #7cffcb;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+    }
+    #controls button:hover {
+      background: #40e0d0;
+    }
+    #controls button:disabled {
+      background: #444;
+      color: #999;
+      cursor: not-allowed;
+    }
+    footer {
+      padding: 0.8rem 2rem;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #777;
+    }
+    .glow {
+      text-shadow:
+        0 0 5px #7cffcb,
+        0 0 10px #7cffcb,
+        0 0 15px #7cffcb,
+        0 0 20px #7cffcb,
+        0 0 30px #7cffcb;
+    }
+  </style>
+
+</head>
+<body>
+  <header class="glow">YOLOv8 Object Tracker</header>
+  <main>
+    <div id="video-container">
+      <img id="video-feed" src="/video_feed" />
+    </div>
+    <aside id="info-panel">
+      <div id="detected-objects">
+        <h2>Detected Objects</h2>
+        <ul id="object-list">
+          <li>Loading detections...</li>
+        </ul>
+      </div>
+      <div id="fps" class="glow">FPS: --</div>
+      <div id="controls">
+        <button id="startBtn">Start Scanning</button>
+        <button id="stopBtn" disabled>Stop Scanning</button>
+      </div>
+    </aside>
+  </main>
+  <footer>Press 'Q' to quit detection | Developed for GenZ</footer>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const objectList = document.getElementById('object-list');
+    const fpsDisplay = document.getElementById('fps');
+
+    async function fetchStatusAndUpdateUI() {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/status");
+        const data = await response.json();
+
+        // Update object list
+        objectList.innerHTML = '';
+        const counts = data.object_counts;
+        if (Object.keys(counts).length === 0) {
+          objectList.innerHTML = '<li>No objects detected</li>';
+        } else {
+          for (const [key, value] of Object.entries(counts)) {
+            const li = document.createElement('li');
+            li.textContent = `${key}: ${value}`;
+            objectList.appendChild(li);
+          }
+        }
+
+        // Update FPS
+        fpsDisplay.textContent = `FPS: ${data.fps.toFixed(1)}`;
+
+        // Update button state based on activity
+        const isScanning = data.fps > 0;
+        startBtn.disabled = isScanning;
+        stopBtn.disabled = !isScanning;
+      } catch (err) {
+        console.error("Error fetching status:", err);
+        objectList.innerHTML = '<li>Error connecting to server</li>';
+        fpsDisplay.textContent = "FPS: --";
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      }
+    }
+
+    startBtn.onclick = async () => {
+      await fetch("http://127.0.0.1:5000/start", { method: "POST" });
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    };
+
+    stopBtn.onclick = async () => {
+      await fetch("http://127.0.0.1:5000/stop", { method: "POST" });
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    };
+
+    // Refresh every second
+    setInterval(fetchStatusAndUpdateUI, 1000);
+  </script>
+</body>
+</html>
